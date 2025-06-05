@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Visualizador de Voz - Web Serial</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Roboto', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 2em;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #58a6ff;
+    }
+
+    p {
+      color: #8b949e;
+      font-size: 1em;
+      margin-top: 0;
+    }
+
+    button {
+      background-color: #238636;
+      border: none;
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 20px 0;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #2ea043;
+    }
+
+    canvas {
+      border-radius: 8px;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      display: block;
+      max-width: 100%;
+      width: 100%;
+      max-width: 900px;
+      height: 240px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Visualizador de Voz Serial</h1>
+  <p>Conecta un dispositivo a 115200 baudios que emita valores entre -3000 y +3000</p>
+  <button id="connect">🔌 Conectar Serial</button>
+  <canvas id="oscilloscope" width="900" height="240"></canvas>
+
+  <script>
+    const connectButton = document.getElementById("connect");
+    const canvas = document.getElementById("oscilloscope");
+    const ctx = canvas.getContext("2d");
+
+    let port, reader;
+    let signalBuffer = Array(canvas.width).fill(0);
+    const inputRange = 3000; // máximo valor absoluto esperado
+
+    connectButton.onclick = async () => {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const decoder = new TextDecoderStream();
+        const inputDone = port.readable.pipeTo(decoder.writable);
+        reader = decoder.readable.getReader();
+
+        readSerial();
+        animate();
+      } catch (err) {
+        alert("Error al abrir el puerto serial: " + err);
+      }
+    };
+
+    async function readSerial() {
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += value;
+          let lines = buffer.split("\n");
+          buffer = lines.pop(); // Deja la última línea incompleta
+
+          for (let line of lines) {
+            let val = parseInt(line.trim());
+            if (!isNaN(val)) {
+              signalBuffer.push(val);
+              signalBuffer.shift(); // mantiene el buffer del tamaño del canvas
+            }
+          }
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height / 2);
+
+      for (let x = 0; x < canvas.width; x++) {
+        const scaled = signalBuffer[x] / inputRange;
+        const y = canvas.height / 2 - scaled * (canvas.height / 2);
+        ctx.lineTo(x, y);
+      }
+
+      ctx.strokeStyle = "#58a6ff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  </script>
+</body>
+</html>
