@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Web Serial - Simulación de Voz</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: white; }
+    canvas { background: #222; display: block; margin: 10px auto; border: 1px solid #555; }
+    button { margin: 10px auto; display: block; padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+  <h2 align="center">Gráfica de Señal de Voz (Web Serial @115200)</h2>
+  <button id="connect">Conectar Serial</button>
+  <canvas id="oscilloscope" width="800" height="200"></canvas>
+
+  <script>
+    const connectButton = document.getElementById("connect");
+    const canvas = document.getElementById("oscilloscope");
+    const ctx = canvas.getContext("2d");
+
+    let port, reader;
+    let signalBuffer = Array(canvas.width).fill(0);
+
+    connectButton.onclick = async () => {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        const decoder = new TextDecoderStream();
+        const inputDone = port.readable.pipeTo(decoder.writable);
+        reader = decoder.readable.getReader();
+
+        readSerial();
+        animate();
+      } catch (err) {
+        alert("Error al abrir el puerto serial: " + err);
+      }
+    };
+
+    async function readSerial() {
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          buffer += value;
+          let lines = buffer.split("\n");
+          buffer = lines.pop(); // Deja la última línea incompleta
+
+          for (let line of lines) {
+            let val = parseInt(line.trim());
+            if (!isNaN(val)) {
+              signalBuffer.push(val);
+              signalBuffer.shift(); // mantiene el buffer del tamaño del canvas
+            }
+          }
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height / 2);
+
+      for (let x = 0; x < canvas.width; x++) {
+        const y = canvas.height / 2 - signalBuffer[x];
+        ctx.lineTo(x, y);
+      }
+
+      ctx.strokeStyle = "#0f0";
+      ctx.stroke();
+    }
+  </script>
+</body>
+</html>
