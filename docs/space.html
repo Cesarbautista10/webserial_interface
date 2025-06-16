@@ -45,7 +45,7 @@
     async function connect() {
       try {
         device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: 'ESP32-ADC-Ctrl' }],
+          filters: [{ namePrefix: 'MrCronos' }],
           optionalServices: ['12345678-1234-1234-1234-1234567890ab']
         });
 
