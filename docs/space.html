@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 BLE Control + ADC</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 30px; background: #f5f5f5; }
+    h1 { color: #333; }
+    #status { margin-top: 10px; font-weight: bold; color: green; }
+    #adcValue { font-size: 2.5em; color: #007acc; margin: 20px 0; }
+    .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px 0; }
+    button {
+      font-size: 1.2em; padding: 10px 20px; border: none;
+      border-radius: 6px; cursor: pointer; color: white;
+    }
+    .connect { background: #34495e; }
+    .disconnect { background: #c0392b; }
+    .red { background: #e74c3c; }
+    .green { background: #2ecc71; }
+    .blue { background: #3498db; }
+    .yellow { background: #f1c40f; color: black; }
+    .cyan { background: #1abc9c; }
+    .off { background: #7f8c8d; }
+  </style>
+</head>
+<body>
+  <h1>ESP32 BLE – LED Control + ADC</h1>
+  <button class="connect" onclick="connect()">🔗 Connect</button>
+  <button class="disconnect" onclick="disconnect()">❌ Disconnect</button>
+  <div id="status">Not connected</div>
+  <div id="adcValue">--</div>
+
+  <div class="controls">
+    <button class="red" onclick="send('1')">🔴 Red</button>
+    <button class="green" onclick="send('2')">🟢 Green</button>
+    <button class="blue" onclick="send('3')">🔵 Blue</button>
+    <button class="yellow" onclick="send('4')">🟡 Yellow</button>
+    <button class="cyan" onclick="send('5')">🔷 Cyan</button>
+    <button class="off" onclick="send('0')">⚫ Off</button>
+  </div>
+
+  <script>
+    let device, characteristic;
+
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: 'ESP32-ADC-Ctrl' }],
+          optionalServices: ['12345678-1234-1234-1234-1234567890ab']
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('12345678-1234-1234-1234-1234567890ab');
+        characteristic = await service.getCharacteristic('abcd1234-5678-90ab-cdef-1234567890ab');
+
+        document.getElementById('status').textContent = "✅ Connected to " + device.name;
+
+        characteristic.addEventListener('characteristicvaluechanged', (event) => {
+          const value = new TextDecoder().decode(event.target.value);
+          document.getElementById('adcValue').textContent = value;
+        });
+
+        await characteristic.startNotifications();
+
+        device.ongattserverdisconnected = () => {
+          document.getElementById('status').textContent = "🔌 Disconnected";
+          document.getElementById('adcValue').textContent = "--";
+        };
+
+      } catch (err) {
+        document.getElementById('status').textContent = "❌ Connection error: " + err;
+      }
+    }
+
+    function disconnect() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+        document.getElementById('status').textContent = "🔌 Disconnected manually";
+        document.getElementById('adcValue').textContent = "--";
+      }
+    }
+
+    async function send(val) {
+      if (!characteristic) return;
+      try {
+        await characteristic.writeValue(new TextEncoder().encode(val));
+      } catch (err) {
+        alert("❌ Send error: " + err);
+      }
+    }
+  </script>
+</body>
+</html>
