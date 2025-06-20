@@ -1,116 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>ESP32 DJ Light Control</title>
+  <title>Control ADC y NeoPixel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      font-family: sans-serif;
-      background: #111;
-      color: #fff;
-      text-align: center;
+      font-family: 'Segoe UI', sans-serif;
+      background: #1e1e2f;
+      color: #eee;
+      margin: 0;
       padding: 20px;
     }
 
     h1 {
+      text-align: center;
       font-size: 2em;
       margin-bottom: 10px;
-      color: #0f0;
+      color: #4dd0e1;
     }
 
     #status {
+      text-align: center;
       margin-bottom: 20px;
       font-weight: bold;
-      color: #0ff;
+      color: #81d4fa;
     }
 
     .section {
       margin-bottom: 30px;
+      text-align: center;
     }
 
     .controls, .effects {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
+      margin-top: 15px;
     }
 
     button {
-      font-size: 1em;
-      padding: 10px 16px;
+      background-color: #3949ab;
       border: none;
       border-radius: 6px;
+      padding: 12px 18px;
+      font-size: 1em;
       color: white;
       cursor: pointer;
-      transition: transform 0.2s;
-      min-width: 110px;
+      transition: background-color 0.3s, transform 0.2s;
     }
 
     button:hover {
+      background-color: #5c6bc0;
       transform: scale(1.05);
     }
 
-    .connect { background: #2980b9; }
-    .disconnect { background: #c0392b; }
+    .connect { background-color: #00897b; }
+    .disconnect { background-color: #d32f2f; }
+    .off { background-color: #607d8b; }
 
-    .red { background: #e74c3c; }
-    .green { background: #27ae60; }
-    .blue { background: #3498db; }
-    .yellow { background: #f1c40f; color: black; }
-    .cyan { background: #1abc9c; }
-    .offColor { background: #7f8c8d; }
+    .adc-box {
+      font-size: 2.5em;
+      background: #263238;
+      border-radius: 8px;
+      padding: 10px 20px;
+      display: inline-block;
+      margin-top: 10px;
+      color: #00e676;
+    }
 
-    .blink { background: #9b59b6; }
-    .fade { background: #16a085; }
-    .transition { background: #f39c12; }
-    .rainbow { background: #8e44ad; }
-    .off { background: #2c3e50; }
+    label, input[type="number"] {
+      font-size: 1em;
+      color: #ccc;
+    }
 
     input[type="number"] {
-      font-size: 1em;
-      padding: 5px;
-      width: 70px;
+      width: 60px;
+      margin-left: 8px;
       text-align: center;
-      margin-left: 10px;
+      background: #2c2c3a;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 5px;
+      color: #fff;
     }
 
     @media (max-width: 600px) {
-      h1 { font-size: 1.5em; }
-      button { font-size: 0.9em; padding: 8px; min-width: 90px; }
+      button {
+        font-size: 0.9em;
+        padding: 10px 12px;
+      }
+
+      .adc-box {
+        font-size: 2em;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>🎧 DJ NeoPixel Controller</h1>
+  <h1>Control ADC y NeoPixel</h1>
+
+  <div id="status">🔌 No conectado</div>
 
   <div class="section">
-    <button class="connect" onclick="connect()">🔗 Connect</button>
-    <button class="disconnect" onclick="disconnect()">❌ Disconnect</button>
-    <div id="status">Not connected</div>
+    <button class="connect" onclick="connect()">🔗 Conectar</button>
+    <button class="disconnect" onclick="disconnect()">❌ Desconectar</button>
   </div>
 
   <div class="section">
-    <label>Number of LEDs:
+    <label>Número de LEDs:
       <input type="number" id="ledCount" value="8" min="1" max="32">
     </label>
   </div>
 
+  <div class="section">
+    <div>Valor ADC actual:</div>
+    <div id="adcValue" class="adc-box">--</div>
+  </div>
+
   <div class="section controls">
-    <button class="red" onclick="send('1')">🔴 Red</button>
-    <button class="green" onclick="send('2')">🟢 Green</button>
-    <button class="blue" onclick="send('3')">🔵 Blue</button>
-    <button class="yellow" onclick="send('4')">🟡 Yellow</button>
-    <button class="cyan" onclick="send('5')">🔷 Cyan</button>
-    <button class="offColor" onclick="send('0')">⚫ Off</button>
+    <button onclick="send('1')">🔴 Rojo</button>
+    <button onclick="send('2')">🟢 Verde</button>
+    <button onclick="send('3')">🔵 Azul</button>
+    <button onclick="send('4')">🟡 Amarillo</button>
+    <button onclick="send('5')">🔷 Cian</button>
+    <button class="off" onclick="send('0')">⚫ Apagar</button>
   </div>
 
   <div class="section effects">
-    <button class="blink" onclick="sendEffect('BLINK')">✨ Blink</button>
-    <button class="fade" onclick="sendEffect('FADE')">🌈 Fade</button>
-    <button class="transition" onclick="sendEffect('TRANSITION')">🎨 Transition</button>
-    <button class="rainbow" onclick="sendEffect('RAINBOW')">🌈 Rainbow</button>
-    <button class="off" onclick="sendEffect('OFF')">🛑 Stop Effect</button>
+    <button onclick="sendEffect('BLINK')">✨ Parpadeo</button>
+    <button onclick="sendEffect('FADE')">🌈 Suavizado</button>
+    <button onclick="sendEffect('TRANSITION')">🎨 Transición</button>
+    <button onclick="sendEffect('RAINBOW')">🌈 Arcoíris</button>
+    <button onclick="sendEffect('OFF')">🛑 Detener</button>
   </div>
 
   <script>
@@ -127,21 +150,30 @@
         const service = await server.getPrimaryService('12345678-1234-1234-1234-1234567890ab');
         characteristic = await service.getCharacteristic('abcd1234-5678-90ab-cdef-1234567890ab');
 
-        document.getElementById('status').textContent = "✅ Connected to " + device.name;
+        document.getElementById('status').textContent = "✅ Conectado a " + device.name;
+
+        characteristic.addEventListener('characteristicvaluechanged', (event) => {
+          const value = new TextDecoder().decode(event.target.value);
+          document.getElementById('adcValue').textContent = value;
+        });
+
+        await characteristic.startNotifications();
 
         device.ongattserverdisconnected = () => {
-          document.getElementById('status').textContent = "🔌 Disconnected";
+          document.getElementById('status').textContent = "🔌 Desconectado";
+          document.getElementById('adcValue').textContent = "--";
         };
 
       } catch (err) {
-        document.getElementById('status').textContent = "❌ Connection error: " + err;
+        document.getElementById('status').textContent = "❌ Error de conexión: " + err;
       }
     }
 
     function disconnect() {
       if (device && device.gatt.connected) {
         device.gatt.disconnect();
-        document.getElementById('status').textContent = "🔌 Disconnected manually";
+        document.getElementById('status').textContent = "🔌 Desconectado manualmente";
+        document.getElementById('adcValue').textContent = "--";
       }
     }
 
@@ -150,14 +182,14 @@
       try {
         await characteristic.writeValue(new TextEncoder().encode(val));
       } catch (err) {
-        alert("❌ Send error: " + err);
+        alert("❌ Error al enviar: " + err);
       }
     }
 
-    async function sendEffect(effectName) {
+    function sendEffect(effect) {
       const count = document.getElementById("ledCount").value || 8;
-      const command = `FX:${effectName},${count}`;
-      send(command);
+      const cmd = `FX:${effect},${count}`;
+      send(cmd);
     }
   </script>
 </body>
