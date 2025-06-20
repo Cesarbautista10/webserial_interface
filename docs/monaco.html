@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Editor + Bluetooth BLE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #topbar {
+      background: #263238;
+      padding: 10px;
+      color: #fff;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #editor {
+      flex: 1;
+      min-height: 200px;
+    }
+
+    #console {
+      background: #000;
+      color: #0f0;
+      padding: 10px;
+      font-family: monospace;
+      height: 120px;
+      overflow-y: auto;
+    }
+
+    button {
+      padding: 8px 14px;
+      margin-left: 8px;
+      margin-top: 5px;
+      background: #26a69a;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #2bbbad;
+    }
+
+    @media (max-width: 600px) {
+      #editor { height: 200px; }
+      button { margin: 5px 0 0 0; width: 100%; }
+      #topbar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+  <div id="topbar">
+    <div><strong>Control ADC y NeoPixel BLE</strong></div>
+    <div>
+      <button onclick="connectBLE()">🔗 Conectar</button>
+      <button onclick="sendCode()">📤 Enviar Código</button>
+      <button onclick="runCode()">▶️ Ejecutar</button>
+    </div>
+  </div>
+
+  <div id="editor"></div>
+  <div id="console">🖥️ Consola lista...<br></div>
+
+  <script>
+    let editor, device, characteristic;
+
+    // Inicializa Monaco
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+      editor = monaco.editor.create(document.getElementById('editor'), {
+        value: `ADD LED ON\nADD WAIT 1000\nADD LED OFF\nADD PRINT Terminado`,
+        language: 'go',
+        theme: 'vs-dark',
+        automaticLayout: true
+      });
+    });
+
+    async function connectBLE() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: 'BLE_Sensor' }],
+          optionalServices: ['12345678-1234-1234-1234-1234567890ab']
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('12345678-1234-1234-1234-1234567890ab');
+        characteristic = await service.getCharacteristic('abcd1234-5678-90ab-cdef-1234567890ab');
+
+        characteristic.addEventListener('characteristicvaluechanged', (event) => {
+          const msg = new TextDecoder().decode(event.target.value);
+          logToConsole(msg);
+        });
+
+        await characteristic.startNotifications();
+        logToConsole("✅ Conectado a " + device.name);
+      } catch (err) {
+        logToConsole("❌ Error: " + err);
+      }
+    }
+
+    async function sendBLELine(text) {
+      if (!characteristic) {
+        logToConsole("⚠️ No conectado");
+        return;
+      }
+      const encoded = new TextEncoder().encode(text);
+      await characteristic.writeValue(encoded);
+      logToConsole("📤 " + text);
+    }
+
+    async function sendCode() {
+      const code = editor.getValue();
+      const lines = code.split("\n").map(l => l.trim()).filter(l => l !== "");
+      for (const line of lines) {
+        await sendBLELine(line);
+        await new Promise(r => setTimeout(r, 150)); // espera entre líneas
+      }
+    }
+
+    async function runCode() {
+      await sendBLELine("RUN");
+    }
+
+    function logToConsole(msg) {
+      const consoleBox = document.getElementById("console");
+      consoleBox.innerHTML += msg + "<br>";
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
